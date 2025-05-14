@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>instant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .setup-area, .connection-status {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        .chat-area {
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+        .messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #fff;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+            position: relative;
+        }
+        .sent {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .received {
+            background-color: #e5e5ea;
+            align-self: flex-start;
+        }
+        .message-content {
+            margin-right: 5px;
+        }
+        .message-actions {
+            display: none;
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .message:hover .message-actions {
+            display: block;
+        }
+        .edit-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #555;
+            font-size: 12px;
+            padding: 2px 5px;
+        }
+        .edited-mark {
+            font-size: 10px;
+            color: #777;
+            font-style: italic;
+            margin-left: 5px;
+        }
+        .typing-indicator {
+            padding: 6px 10px;
+            font-style: italic;
+            color: #666;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        input, button, textarea {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        input, textarea {
+            flex-grow: 1;
+        }
+        button {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            text-align: center;
+            font-weight: bold;
+        }
+        .connected {
+            color: #4caf50;
+        }
+        .disconnected {
+            color: #f44336;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            background-color: #f1f1f1;
+        }
+        .tab.active {
+            background-color: white;
+            border-bottom: none;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>instant</h1>
+        
+        <div class="tabs">
+            <div class="tab active" id="tab-create">Create Connection</div>
+            <div class="tab" id="tab-join">Join Connection</div>
+        </div>
+        
+        <div class="setup-area" id="create-connection">
+            <h2>Create a Connection</h2>
+            <p>Generate your connection ID and share it with your friend:</p>
+            <button id="generate-offer">Generate Connection ID</button>
+            <div id="connection-offer" style="margin-top: 10px; display: none;">
+                <p>Your Connection ID (share this with your friend):</p>
+                <textarea id="offer-sdp" rows="3" readonly></textarea>
+                <button id="copy-offer">Copy Connection ID</button>
+                
+                <p>Enter your friend's answer:</p>
+                <textarea id="answer-sdp" rows="3" placeholder="Paste your friend's answer here"></textarea>
+                <button id="connect-with-answer">Connect</button>
+            </div>
+        </div>
+        
+        <div class="setup-area hidden" id="join-connection">
+            <h2>Join a Connection</h2>
+            <p>Paste the Connection ID shared by your friend:</p>
+            <textarea id="received-offer-sdp" rows="3" placeholder="Paste your friend's connection ID here"></textarea>
+            <button id="generate-answer">Generate Answer</button>
+            
+            <div id="connection-answer" style="margin-top: 10px; display: none;">
+                <p>Your Answer (share this with your friend):</p>
+                <textarea id="local-answer-sdp" rows="3" readonly></textarea>
+                <button id="copy-answer">Copy Answer</button>
+            </div>
+        </div>
+        
+        <div class="connection-status">
+            <p class="status disconnected" id="connection-status">Disconnected</p>
+        </div>
+        
+        <div class="chat-area">
+            <div class="messages" id="messages"></div>
+            <div id="typing-indicator" class="typing-indicator">Your friend is typing...</div>
+            <div class="input-area">
+                <input type="text" id="message-input" placeholder="Type your message..." disabled>
+                <button id="send-button" disabled>Send</button>
+            </div>
+            
+            <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                <p>• Hover over your messages to reveal the edit option</p>
+                <p>• Press Enter to send or update messages</p>
+                <p>• Typing indicators appear automatically</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const generateOfferBtn = document.getElementById('generate-offer');
+        const offerSdpTextarea = document.getElementById('offer-sdp');
+        const copyOfferBtn = document.getElementById('copy-offer');
+        const answerSdpTextarea = document.getElementById('answer-sdp');
+        const connectWithAnswerBtn = document.getElementById('connect-with-answer');
+        const receivedOfferSdpTextarea = document.getElementById('received-offer-sdp');
+        const generateAnswerBtn = document.getElementById('generate-answer');
+        const localAnswerSdpTextarea = document.getElementById('local-answer-sdp');
+        const copyAnswerBtn = document.getElementById('copy-answer');
+        const connectionStatusElement = document.getElementById('connection-status');
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const connectionOfferDiv = document.getElementById('connection-offer');
+        const connectionAnswerDiv = document.getElementById('connection-answer');
+        const tabCreate = document.getElementById('tab-create');
+        const tabJoin = document.getElementById('tab-join');
+        const createConnectionSection = document.getElementById('create-connection');
+        const joinConnectionSection = document.getElementById('join-connection');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        // WebRTC Variables
+        let peerConnection = null;
+        let dataChannel = null;
+        let localICECandidates = [];
+        let messageBeingEdited = null;
+        let typingTimeout = null;
+
+        // Function to initialize peer connection
+        function initPeerConnection() {
+            const configuration = {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            };
+
+            peerConnection = new RTCPeerConnection(configuration);
+
+            peerConnection.onicecandidate = event => {
+                if (event.candidate) {
+                    localICECandidates.push(event.candidate);
+                }
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log("ICE Connection State:", peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'connected' || 
+                    peerConnection.iceConnectionState === 'completed') {
+                    connectionStatusElement.textContent = 'Connected';
+                    connectionStatusElement.classList.remove('disconnected');
+                    connectionStatusElement.classList.add('connected');
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                } else if (peerConnection.iceConnectionState === 'disconnected' || 
+                           peerConnection.iceConnectionState === 'failed' || 
+                           peerConnection.iceConnectionState === 'closed') {
+                    connectionStatusElement.textContent = 'Disconnected';
+                    connectionStatusElement.classList.remove('connected');
+                    connectionStatusElement.classList.add('disconnected');
+                    messageInput.disabled = true;
+                    sendButton.disabled = true;
+                }
+            };
+
+            return peerConnection;
+        }
+
+        // Tab switching
+        tabCreate.addEventListener('click', () => {
+            tabCreate.classList.add('active');
+            tabJoin.classList.remove('active');
+            createConnectionSection.classList.remove('hidden');
+            joinConnectionSection.classList.add('hidden');
+        });
+
+        tabJoin.addEventListener('click', () => {
+            tabJoin.classList.add('active');
+            tabCreate.classList.remove('active');
+            joinConnectionSection.classList.remove('hidden');
+            createConnectionSection.classList.add('hidden');
+        });
+
+        // Create connection (generate offer)
+        generateOfferBtn.addEventListener('click', async () => {
+            // Initialize connection and create data channel
+            peerConnection = initPeerConnection();
+            dataChannel = peerConnection.createDataChannel('chat');
+            setupDataChannel(dataChannel);
+
+            try {
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                // Add local ICE candidates to the offer
+                setTimeout(() => {
+                    const fullOffer = {
+                        sdp: peerConnection.localDescription,
+                        ice: localICECandidates
+                    };
+                    offerSdpTextarea.value = JSON.stringify(fullOffer);
+                    connectionOfferDiv.style.display = 'block';
+                }, 1000); // Wait for ICE candidates to gather
+            } catch (error) {
+                console.error('Error creating offer:', error);
+                alert('Failed to create connection offer: ' + error.message);
+            }
+        });
+
+        // Copy offer to clipboard
+        copyOfferBtn.addEventListener('click', () => {
+            offerSdpTextarea.select();
+            document.execCommand('copy');
+            copyOfferBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyOfferBtn.textContent = 'Copy Connection ID';
+            }, 2000);
+        });
+
+        // Connect with the received answer
+        connectWithAnswerBtn.addEventListener('click', async () => {
+            try {
+                const answerData = JSON.parse(answerSdpTextarea.value);
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(answerData.sdp));
+                
+                // Add ICE candidates from the answer
+                for (const candidate of answerData.ice) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                
+                connectionStatusElement.textContent = 'Connecting...';
+            } catch (error) {
+                console.error('Error connecting with answer:', error);
+                alert('Failed to connect: ' + error.message);
+            }
+        });
+
+        // Join connection (generate answer)
+        generateAnswerBtn.addEventListener('click', async () => {
+            try {
+                const offerData = JSON.parse(receivedOfferSdpTextarea.value);
+                peerConnection = initPeerConnection();
+                
+                // Set up data channel event handler for the answerer
+                peerConnection.ondatachannel = (event) => {
+                    dataChannel = event.channel;
+                    setupDataChannel(dataChannel);
+                };
+                
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData.sdp));
+                
+                // Add ICE candidates from the offer
+                for (const candidate of offerData.ice) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                // Add local ICE candidates to the answer
+                setTimeout(() => {
+                    const fullAnswer = {
+                        sdp: peerConnection.localDescription,
+                        ice: localICECandidates
+                    };
+                    localAnswerSdpTextarea.value = JSON.stringify(fullAnswer);
+                    connectionAnswerDiv.style.display = 'block';
+                    connectionStatusElement.textContent = 'Connecting...';
+                }, 1000); // Wait for ICE candidates to gather
+            } catch (error) {
+                console.error('Error generating answer:', error);
+                alert('Failed to generate answer: ' + error.message);
+            }
+        });
+
+        // Copy answer to clipboard
+        copyAnswerBtn.addEventListener('click', () => {
+            localAnswerSdpTextarea.select();
+            document.execCommand('copy');
+            copyAnswerBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyAnswerBtn.textContent = 'Copy Answer';
+            }, 2000);
+        });
+
+        // Set up data channel
+        function setupDataChannel(channel) {
+            channel.onopen = () => {
+                console.log('Data channel is open');
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+            };
+            
+            channel.onclose = () => {
+                console.log('Data channel is closed');
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+            };
+            
+            channel.onmessage = event => {
+                const messageData = JSON.parse(event.data);
+                
+                switch(messageData.type) {
+                    case 'message':
+                        displayMessage(messageData.content, 'received', messageData.id);
+                        break;
+                    case 'edit':
+                        updateMessage(messageData.id, messageData.content, 'received');
+                        break;
+                    case 'typing':
+                        handleTypingIndicator(messageData.isTyping);
+                        break;
+                }
+            };
+        }
+
+        // Handle typing indicator from peer
+        function handleTypingIndicator(isTyping) {
+            if (isTyping) {
+                typingIndicator.style.display = 'block';
+            } else {
+                typingIndicator.style.display = 'none';
+            }
+        }
+
+        // Send typing status to peer
+        function sendTypingStatus(isTyping) {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                const typingData = {
+                    type: 'typing',
+                    isTyping: isTyping
+                };
+                dataChannel.send(JSON.stringify(typingData));
+            }
+        }
+
+        // Send message
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', event => {
+            if (event.key === 'Enter') {
+                if (messageBeingEdited) {
+                    finishEditing();
+                } else {
+                    sendMessage();
+                }
+            }
+        });
+
+        // Handle typing indicator
+        messageInput.addEventListener('input', () => {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                // Clear any existing timeout
+                clearTimeout(typingTimeout);
+                
+                // Send typing indicator
+                sendTypingStatus(true);
+                
+                // Set timeout to stop typing indicator after 2 seconds of inactivity
+                typingTimeout = setTimeout(() => {
+                    sendTypingStatus(false);
+                }, 2000);
+            }
+        });
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && dataChannel && dataChannel.readyState === 'open') {
+                const messageId = Date.now().toString();
+                const messageData = {
+                    type: 'message',
+                    content: message,
+                    id: messageId
+                };
+                dataChannel.send(JSON.stringify(messageData));
+                displayMessage(message, 'sent', messageId);
+                messageInput.value = '';
+                
+                // Clear typing status
+                clearTimeout(typingTimeout);
+                sendTypingStatus(false);
+            }
+        }
+
+        // Edit message
+        function editMessage(messageId, content) {
+            messageBeingEdited = messageId;
+            messageInput.value = content;
+            messageInput.focus();
+            sendButton.textContent = 'Update';
+        }
+
+        // Finish editing and send updated message
+        function finishEditing() {
+            const updatedContent = messageInput.value.trim();
+            if (updatedContent && dataChannel && dataChannel.readyState === 'open') {
+                const messageData = {
+                    type: 'edit',
+                    content: updatedContent,
+                    id: messageBeingEdited
+                };
+                dataChannel.send(JSON.stringify(messageData));
+                updateMessage(messageBeingEdited, updatedContent, 'sent');
+                messageInput.value = '';
+                messageBeingEdited = null;
+                sendButton.textContent = 'Send';
+            }
+        }
+
+        // Update the message content for edits
+        function updateMessage(messageId, content, type) {
+            const messageElement = document.querySelector(`.message[data-id="${messageId}"]`);
+            if (messageElement) {
+                const contentElement = messageElement.querySelector('.message-content');
+                contentElement.textContent = content;
+                
+                // Add edited mark if not already present
+                if (!messageElement.querySelector('.edited-mark')) {
+                    const editedMark = document.createElement('span');
+                    editedMark.classList.add('edited-mark');
+                    editedMark.textContent = '(edited)';
+                    contentElement.appendChild(editedMark);
+                }
+            }
+        }
+
+        // Display message in the chat
+        function displayMessage(message, type, messageId = Date.now().toString()) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', type);
+            messageElement.dataset.id = messageId;
+            
+            const contentSpan = document.createElement('span');
+            contentSpan.classList.add('message-content');
+            contentSpan.textContent = message;
+            messageElement.appendChild(contentSpan);
+            
+            // Add edit button only to sent messages
+            if (type === 'sent') {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.classList.add('message-actions');
+                
+                const editBtn = document.createElement('button');
+                editBtn.classList.add('edit-btn');
+                editBtn.textContent = '✎';
+                editBtn.title = 'Edit message';
+                editBtn.addEventListener('click', () => {
+                    editMessage(messageId, message);
+                });
+                
+                actionsDiv.appendChild(editBtn);
+                messageElement.appendChild(actionsDiv);
+            }
+            
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
